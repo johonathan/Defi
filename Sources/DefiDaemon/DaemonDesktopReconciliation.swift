@@ -181,7 +181,6 @@ extension Daemon {
     displayReconciliationInFlight = true
     let generation = displayReconciliationGeneration
     let session = desktopSessionGeneration
-    platform.invalidateFrameStateForDisplayChange()
     DispatchQueue.main.async { [self] in
       let changed = displayArrangement.reconcile()
       let deskFrames = displayArrangement.deskFrames
@@ -196,6 +195,12 @@ extension Daemon {
           displayReconciliationPending = pending
         }
         if changed {
+          // Only a real change resets what depends on the displays: macOS also posts screen
+          // changes when nothing changed, and a reset cut motions and closed open panels.
+          platform.invalidateFrameStateForDisplayChange()
+          closeOverview()
+          handleCheatsheetInput(.dismiss)
+          closeRecentWindows()
           scheduleDisplayReconciliation()
         } else {
           needsDesktopSync = true
@@ -207,9 +212,6 @@ extension Daemon {
 
   func scheduleDisplayReconciliation() {
     invalidateDisplayArrangement()
-    closeOverview()
-    handleCheatsheetInput(.dismiss)
-    closeRecentWindows()
     displayConfigurationEventCount += 1
     let now = ProcessInfo.processInfo.systemUptime
     pendingDisplaySyncDeadlines = [0.05, 0.2, 0.5, 1.0, 2.0].map {
